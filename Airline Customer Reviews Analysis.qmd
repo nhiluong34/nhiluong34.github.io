@@ -1,5 +1,5 @@
 ---
-title: "SDS 264 Mini-project 1"
+title: "Airline Reviews Analysis"
 author: "Nhi Luong"
 editor: visual
 editor_options: 
