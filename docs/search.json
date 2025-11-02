@@ -1,0 +1,149 @@
+[
+  {
+    "objectID": "Airline Customer Reviews Analysis.html",
+    "href": "Airline Customer Reviews Analysis.html",
+    "title": "SDS 264 Mini-project 1",
+    "section": "",
+    "text": "In this project, I will apply text and sentiment analysis to explore the frequency of words, trends, and create visualizations on a dataset of airline customer reviews. The dataset is found on Kaggle website that includes airline reviews from 2006 to 2019 for popular international and domestic airlines around the world. According to the author, the data is scraped in Spring 2019."
+  },
+  {
+    "objectID": "Airline Customer Reviews Analysis.html#bing-net-sentiment",
+    "href": "Airline Customer Reviews Analysis.html#bing-net-sentiment",
+    "title": "SDS 264 Mini-project 1",
+    "section": "Bing Net Sentiment",
+    "text": "Bing Net Sentiment\nBesides exploring the negative and positive sentiments as two different groups, we can also add them together to get a net sentiment. Since the number of total words heavily depends on the number of total reviews for each airline, I first calculated the net bing sentiment for each airline, divided the net sentiment by the number of review words in each airline, and selected the top five airlines with the highest proportion.\n\nairline_counts &lt;- tidy_airline |&gt;\n  group_by(airline) |&gt;\n  summarise(n = n()) |&gt;\n  rename(tot_word = n)\n\n\n# highest net sentiment\ntidy_airline |&gt;\n  inner_join(bing_sentiments) |&gt;\n  count(airline, sentiment, sort = TRUE) |&gt;\n  group_by(airline, sentiment) |&gt;\n  slice_max(n, n = 1) |&gt;\n  ungroup() |&gt;\n  pivot_wider(names_from = sentiment, values_from = n) |&gt;\n  inner_join(airline_counts) |&gt;\n  mutate(sentiment = positive - negative,\n         prop_sentiment = sentiment/tot_word)|&gt;\n  slice_max(sentiment, n = 5) |&gt;\n  ggplot(aes(fct_reorder(airline, prop_sentiment), \n             prop_sentiment, fill = airline)) +\n  \n  geom_col() +\n  coord_flip() +\n  labs(title = \"Top 5 Airlines with Highest Proportion Net Bing Sentiment\",\n       x = \"Airlines\",\n       y = \"Proportion of Net Sentiment\",\n       fill = \"Airline\") +\n  theme_minimal() +\n  scale_fill_colorblind()\n\n\n\n\n\n\n\n\nWee see that the top 5 airlines with the highest proportion are China Southern Airlines, Qatar Airways, Singapore, Lufthansa, and Cathay Pacific Airways. Take a closer look and we see that these airlines are known as some of the best airlines in the world (https://www.worldairlineawards.com/worlds-top-100-airlines-2025/). We can also see that none of the American airlines made it to top five even though they are in the top five of word counts. So let us take a deeper dive into the US airlines to see what the customers are saying!"
+  },
+  {
+    "objectID": "Airline Customer Reviews Analysis.html#explore-us-airlines",
+    "href": "Airline Customer Reviews Analysis.html#explore-us-airlines",
+    "title": "SDS 264 Mini-project 1",
+    "section": "Explore US Airlines",
+    "text": "Explore US Airlines\nIn this section, I used nrc sentiments to explore review sentiments since nrc sentiments give us more emotions that we can get more meanings from. I have removed “positive” and “negative” sentiments because I would like to really focus on the actual emotions.\n\nus_airline &lt;- small_airline |&gt;\n  filter(airline %in% c(\"American Airlines\", \"Alaska Airlines\", \n                        \"Jetblue Airways\", \"Southwest Airlines\", \n                        \"Delta Air Lines\", \"United Airlines\", \n                        \"Spirit Airlines\", \"Frontier Airlines\")) |&gt;\n  select(airline) |&gt; distinct(airline)\n\n\nnrc_sentiments &lt;- get_sentiments(\"nrc\")\ntidy_airline |&gt;\n  inner_join(us_airline) |&gt;\n  anti_join(smart_stopwords) |&gt;\n  inner_join(nrc_sentiments) |&gt;\n  filter(sentiment != \"positive\" & sentiment != \"negative\") |&gt;\n  count(airline, sentiment) |&gt;\n  left_join(airline_counts) |&gt;\n  mutate(airline = fct_relevel(airline, \"United Airlines\", \n                               \"American Airlines\", \"Spirit Airlines\",\n                               \"Delta Air Lines\", \"Frontier Airlines\",\n                               \"Southwest Airlines\", \"Jetblue Airways\",\n                               \"Alaska Airlines\"\n                               ),\n         prop_sentiment = n/tot_word\n         ) |&gt;\n  ggplot(aes(fct_reorder(sentiment, prop_sentiment), \n             prop_sentiment, fill = sentiment) ) +\n  geom_col() +\n  facet_wrap(~airline, ncol = 2) +\n  labs(title = \"NRC Sentiment Across US Airlines\",\n       x = \"Sentiment\",\n       y = \"Sentiment Proportion\",\n       fill = \"Sentiment\") +\n  theme(axis.text.x = element_blank()) +\n  theme_minimal() +\n  scale_fill_colorblind() +\n  coord_flip()\n\n\n\n\n\n\n\n\nUsing the nrc sentiment, we see that “trust” sentiment has the highest proportion in all airlines except Frontier Airlines with “anticipation” having just a slightly higher proportion than “trust” has. In some airlines such as American Airlines, Frontier Airlines, and Jetblue Airways, “sadness” has a little bit more counts than “joy” has."
+  },
+  {
+    "objectID": "index.html",
+    "href": "index.html",
+    "title": "Nhi Luong",
+    "section": "",
+    "text": "Hello! I’m Nhi. I’m an undergraduate student studying Mathematics, Data Science, and Chinese at St. Olaf College. I love learning about text and sentiment analysis and predictive models for transportation-related problems, especially in aviation. I collect a lot of Lego sets and my favorite themes are Architecture and Technic. Explore around my website to learn more!"
+  },
+  {
+    "objectID": "index.html#education",
+    "href": "index.html#education",
+    "title": "Nhi Luong",
+    "section": "Education",
+    "text": "Education\nSt. Olaf College | Northfield, MN\nB.A. in Mathematics, Chinese, Asian Studies\nConcentration in Statistics & Data Science"
+  },
+  {
+    "objectID": "R_tip.html#section",
+    "href": "R_tip.html#section",
+    "title": "R Tip of the Day",
+    "section": "",
+    "text": "Let’s explore tmcn!"
+  },
+  {
+    "objectID": "R_tip.html#short-introduction",
+    "href": "R_tip.html#short-introduction",
+    "title": "R Tip of the Day",
+    "section": "Short Introduction",
+    "text": "Short Introduction\n\nThe tmcn package is a text mining toolkit for the Chinese language.\n\nWe can use functions from the package to:\n\n\nConvert from Traditional Chinese to Simplified Chinese (and reverse)\nConvert Chinese text to pinyin format\nOutput dictionary of Chinese stop words\nGive some useful information about a character such as pinyin, radicals, stroke number of radical"
+  },
+  {
+    "objectID": "R_tip.html#convert-chinese-text-to-pinyin-topinyin",
+    "href": "R_tip.html#convert-chinese-text-to-pinyin-topinyin",
+    "title": "R Tip of the Day",
+    "section": "Convert Chinese text to Pinyin: toPinyin()",
+    "text": "Convert Chinese text to Pinyin: toPinyin()\n\n\nPinyin is a romanized spelling of Chinese words. For example:\n\n\n\n\n妈妈 –&gt; ma1ma1\n\n\n\n\n爸爸 –&gt; ba4ba"
+  },
+  {
+    "objectID": "R_tip.html#lets-try-it",
+    "href": "R_tip.html#lets-try-it",
+    "title": "R Tip of the Day",
+    "section": "Let’s try it!",
+    "text": "Let’s try it!\n\nchinese_words &lt;- c(\"爸爸\",\"妈妈\",\"圣奥拉夫\",\"老师\",\"学生\",\"电脑\",\"大学\",\"秋季\")"
+  },
+  {
+    "objectID": "R_tip.html#lets-try-it-1",
+    "href": "R_tip.html#lets-try-it-1",
+    "title": "R Tip of the Day",
+    "section": "Let’s try it!",
+    "text": "Let’s try it!\n\nchinese_words &lt;- c(\"爸爸\",\"妈妈\",\"圣奥拉夫\",\"老师\",\"学生\",\"电脑\",\"大学\",\"秋季\")\ntoPinyin(chinese_words)\n\n[1] \"baba\"        \"mama\"        \"shengaolafu\" \"laoshi\"      \"xuesheng\"   \n[6] \"diannao\"     \"daxue\"       \"qiuji\""
+  },
+  {
+    "objectID": "R_tip.html#how-about-a-table",
+    "href": "R_tip.html#how-about-a-table",
+    "title": "R Tip of the Day",
+    "section": "How about a table?",
+    "text": "How about a table?\n\n\n\n\n\n\n\nChinese Words\nPinyin\nEnglish Translation\n\n\n\n\n爸爸\nbaba\nfather\n\n\n妈妈\nmama\nmother\n\n\n圣奥拉夫\nshengaolafu\nSaint Olaf\n\n\n老师\nlaoshi\nteacher\n\n\n学生\nxuesheng\nstudent\n\n\n电脑\ndiannao\ncomputer\n\n\n大学\ndaxue\nuniversity\n\n\n秋季\nqiuji\nfall (season)"
+  },
+  {
+    "objectID": "R_tip.html#convert-traditional-to-simplified-totrad",
+    "href": "R_tip.html#convert-traditional-to-simplified-totrad",
+    "title": "R Tip of the Day",
+    "section": "Convert traditional to simplified: toTrad()",
+    "text": "Convert traditional to simplified: toTrad()\n\nchinese_words &lt;-c(\"爸爸\",\"妈妈\",\"圣奥拉夫\",\"老师\",\"学生\",\"电脑\",\"大学\",\"秋季\")"
+  },
+  {
+    "objectID": "R_tip.html#convert-traditional-to-simplified-totrad-1",
+    "href": "R_tip.html#convert-traditional-to-simplified-totrad-1",
+    "title": "R Tip of the Day",
+    "section": "Convert traditional to simplified: toTrad()",
+    "text": "Convert traditional to simplified: toTrad()\n\nchinese_words &lt;-c(\"爸爸\",\"妈妈\",\"圣奥拉夫\",\"老师\",\"学生\",\"电脑\",\"大学\",\"秋季\")\ntoTrad(chinese_words)\n\n[1] \"爸爸\"     \"媽媽\"     \"聖奧拉夫\" \"老師\"     \"學生\"     \"電腦\"     \"大學\"    \n[8] \"秋季\"    \n\n\n\n\n\n\n\n\n\nSimplified\nTraditional\nEnglish Translation\n\n\n\n\n妈妈\n媽媽\nmother\n\n\n电脑\n電腦\ncomputer"
+  },
+  {
+    "objectID": "R_tip.html#explore-gbk-dataset",
+    "href": "R_tip.html#explore-gbk-dataset",
+    "title": "R Tip of the Day",
+    "section": "Explore GBK Dataset",
+    "text": "Explore GBK Dataset\n\nGBK dataset provides users some useful information of a character such as pinyin, radical, stroke numbers of radical.\n\n\nGBK |&gt;\n  as_tibble() |&gt;\n  slice_head(n = 3)\n\n# A tibble: 3 × 8\n  GBK   py0   py        Radical Stroke_Num_Radical Stroke_Order Structure   Freq\n  &lt;chr&gt; &lt;chr&gt; &lt;chr&gt;     &lt;chr&gt;                &lt;int&gt; &lt;chr&gt;        &lt;chr&gt;      &lt;dbl&gt;\n1 吖    a     ā yā      口                       3 丨フ一丶ノ丨 左右          26\n2 阿    a     ā ɑ ē     阝                       2 フ丨一丨フ一丨…… 左右      526031\n3 啊    a     ɑ á à ǎ ā 口                       3 丨フ一フ丨一丨フ一丨…… 左中右     53936"
+  },
+  {
+    "objectID": "R_tip.html#explore-gbk-dataset-1",
+    "href": "R_tip.html#explore-gbk-dataset-1",
+    "title": "R Tip of the Day",
+    "section": "Explore GBK Dataset",
+    "text": "Explore GBK Dataset\nchinese_words_split &lt;- c(\"爸\",\"爸\",\"妈\",\"妈\",\"圣\",\"奥\",\"拉\",\"夫\",\"老\",\"师\",\"学\",\"生\",\"电\",\"脑\",\"大\",\"学\",\"秋\",\"季\")\nchinese_words_split |&gt;\n  as.tibble() |&gt;\n  distinct(value) |&gt;\n  inner_join(GBK, join_by(value == GBK)) |&gt;\n  slice_head(n = 5) |&gt;\n  select(1:5)"
+  },
+  {
+    "objectID": "R_tip.html#explore-gbk-dataset-2",
+    "href": "R_tip.html#explore-gbk-dataset-2",
+    "title": "R Tip of the Day",
+    "section": "Explore GBK Dataset",
+    "text": "Explore GBK Dataset\n\nGBK dataset provides users some useful information of a character such as pinyin, radicals, stroke numbers of radical.\n\n\nchinese_words_split &lt;- c(\"爸\",\"爸\",\"妈\",\"妈\",\"圣\",\"奥\",\"拉\",\"夫\",\"老\",\"师\",\"学\",\"生\",\"电\",\"脑\",\"大\",\"学\",\"秋\",\"季\")\nchinese_words_split |&gt;\n  as.tibble() |&gt;\n  distinct(value) |&gt;\n  inner_join(GBK, join_by(value == GBK)) |&gt;\n  slice_head(n = 5) |&gt;\n  select(1:5)\n\n# A tibble: 5 × 5\n  value py0   py          Radical Stroke_Num_Radical\n  &lt;chr&gt; &lt;chr&gt; &lt;chr&gt;       &lt;chr&gt;                &lt;int&gt;\n1 爸    ba    bà          父                       4\n2 妈    ma    mā          女                       3\n3 圣    sheng shènɡ       土                       3\n4 奥    ao    ào yù       大                       3\n5 拉    la    lá là lǎ lā 扌                       3"
+  },
+  {
+    "objectID": "R_tip.html#in-action",
+    "href": "R_tip.html#in-action",
+    "title": "R Tip of the Day",
+    "section": "In action!",
+    "text": "In action!\n\n“女” + “马” = “妈”"
+  },
+  {
+    "objectID": "R_tip.html#in-action-1",
+    "href": "R_tip.html#in-action-1",
+    "title": "R Tip of the Day",
+    "section": "In action!",
+    "text": "In action!\n\n“woman” + “horse” = “mother”\n“女” + “马” = “妈”"
+  },
+  {
+    "objectID": "R_tip.html#journey-to-the-west",
+    "href": "R_tip.html#journey-to-the-west",
+    "title": "R Tip of the Day",
+    "section": "Journey to the West",
+    "text": "Journey to the West\n\n\nOne of the most famous Chinese novels is “Journey to the West”. Below is an excerpt from chapter 4.\n\n\njourney_west[[1]][1]\n\n[1] \"話表齊天大聖到底是個妖猴，更不知官銜品從，也不較俸祿高低，但只註名便 了。那齊天府下二司仙吏，早晚伏侍，只知日食三餐，夜眠一榻，無事牽縈， 自由自在。閑時節會友遊宮，交朋結義。見三清稱個「老」字，逢四帝道個 「陛下」。與那九曜星、五方將、二十八宿、四大天王、十二元辰、五方五老 、普天星相、河漢群神，俱只以弟兄相待，彼此稱呼。今日東遊，明日西蕩， 雲去雲來，行蹤不定。\"\n\n\n\n\n\nLooking at some Chinese stop words from STOPWORDS dataset\n\n\nhead(STOPWORDS)\n\n  word\n1 第二\n2 一番\n3 一直\n4 一个\n5 一些\n6 许多\n\n\n\n\nLink: Journey to the West Novel"
+  },
+  {
+    "objectID": "R_tip.html#can-we-make-a-wordcloud-for-chapter-4",
+    "href": "R_tip.html#can-we-make-a-wordcloud-for-chapter-4",
+    "title": "R Tip of the Day",
+    "section": "Can we make a wordcloud for chapter 4?",
+    "text": "Can we make a wordcloud for chapter 4?\n\nCodeWordcloud\n\n\n\njourney_west_token &lt;- journey_west |&gt;\n  unnest_tokens(word, \"第五回 亂蟠桃大聖偷丹　反天宮諸神捉怪\", token = \"words\")\n\njourney_dfs &lt;- journey_west_token |&gt;\n  anti_join(STOPWORDS) |&gt;\n  mutate(simplified = toTrad(word, rev = T)) |&gt;\n  count(simplified, sort = T) |&gt;\n  slice_head(n = 50) |&gt;\n  data.frame()\n\nwordcloud2(\n  journey_dfs, \n  size = 1.2, \n  shape = 'cardioid',\n  minSize = 15\n)"
+  },
+  {
+    "objectID": "about.html",
+    "href": "about.html",
+    "title": "About",
+    "section": "",
+    "text": "About this site\n\n1 + 1\n\n[1] 2"
+  }
+]
