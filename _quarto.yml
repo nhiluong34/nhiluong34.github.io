@@ -1,0 +1,37 @@
+project:
+  type: website
+  output-dir: docs
+website:
+  title: "Nhi Luong"
+  navbar:
+    left:
+      - href: index.qmd
+        text: Home
+      - text: "Data Science Projects"
+        menu:
+          - text: "Korean Drama Analysis"
+            href: Korean Drama Analysis.qmd
+          - text: "Airline Reviews Analysis"
+            href: Airline Customer Reviews Analysis.qmd
+          - text: "tmcn R Package "
+            href: R_tip.qmd
+      - text: "Statistics Projects"
+        menu: 
+          - text: "Asian American Quality of Life"
+            href: Asian American QOL.qmd
+          - text: "Spotify Song Characteristics"
+            href: Spotify song characteristics.qmd
+      - text: "Machine Learning Projects"
+        menu:
+          - text: "Handwritten Digits Classification"
+            href: Digits classification.qmd
+format:
+  html:
+    theme:
+      - cosmo
+      - brand
+    embed-resources: true
+    css: styles.css
+    toc: true
+    page-layout: full
+

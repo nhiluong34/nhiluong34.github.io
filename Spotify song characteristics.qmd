@@ -1,0 +1,278 @@
+---
+title: "Spotify Song Characteristics"
+author: "Nhi Luong" 
+date: "`r Sys.Date()`"
+output:
+  pdf_document: default
+editor_options: 
+  chunk_output_type: console
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, warning=FALSE, meessage=FALSE)
+
+library(tidyverse)
+library(ggResidpanel)
+library(ggthemes)
+```
+
+# Introduction
+
+In this project, I will explore a dataset about Song characteristics from Spotify. 
+
+## Section: Set-up
+
+```{r, message=FALSE}
+library(tidyverse)
+spotify <- read_csv("~/Downloads/spotify.csv")
+```
+
+- I will be using the “Spotify” data set. The data set has 200 observations with 155 unique songs collected from four points during the year 2021 along with the characteristic of each song. The original data was collected by two St. Olaf students as their project. It was collected using data from Spotify in order to understand why certain songs are popular.
+
+```{r}
+spotify|>
+  distinct(title) |>
+  count()
+```
+
+
+## Section A: Two-means
+
+1. Explore a quantitative response variable and binary categorical explanatory variable. 
+
+- I chose *valence* to be numeric response variable and *instrumentalness* to be binary categorical explanatory variable. Valence describes the musical positiveness of a track. The more positive a track is, the closer the
+value is to 1.0. Instrumentalness classifies whether a song is instrumental or not. 
+
+- Research question: Is there a difference in the valence score of songs classified as instrumental and songs not classified as instrumentl? In other words, does instrumentalness affect a song's valence score?
+
+2. Explore and describe the relationship *between* the two variables with appropriate summary statistics.
+
+```{r}
+mosaic::favstats(valence ~ instrumentalness, data = spotify)
+
+fitlineA <- lm(valence ~ instrumentalness, data = spotify)
+resid_panel(fitlineA)
+```
+
+```{r}
+spotify |>
+  ggplot(aes(y = valence, x = instrumentalness, fill = instrumentalness)) +
+  geom_boxplot(width = 0.25) +
+  geom_jitter(width = 0.05, alpha = 0.5) +
+  theme(legend.position = "none") +
+  labs(title = "Valence Score - Instrumental vs. Not Instrumental",
+       x = "Instrumentalness",
+       y = "Valence Score") + coord_flip()
+```
+
+- Instrumental songs have mean valence score of 0.449, and non instrumental songs have mean valence score of 0.519. Not instrumental songs have a slightly higher mean valence score than instrumental songs.  
+
+
+3. Perform the appropriate hypothesis test
+
+*Hypothesis Test*
+
+- Null hypothesis: $H_0: \mu_{i} - \mu_{ni} = 0$. There is no difference in the mean valence score of instrumental and not instrumental songs. The instrumentalness doesn't affect the songs' valence score. 
+
+- Alternative hypothesis: $H_A: \mu_{i} - \mu_{ni} \ne 0$. There is a difference in the mean valence score of instrumental and not instrumental songs. The instrumentalness does affect the songs' valence score. 
+
+```{r}
+t.test(valence ~ instrumentalness, data = spotify)
+```
+
+- From the t-test, we have the test statistic of -2.097 and p-value of 0.0376.
+
+- The 95% confidence interval is -0.136 and -0.004. We are 95% confident that mean valence scores for instrumental songs are between 0.004 and 0.136 points lower than non instrumental songs. There is no 0 within the interval so we know the difference is significant. 
+
+4. Check assumptions/conditions for the test.
+
+- There are two conditions for the test: Independent and Normality
+
+- Independent: Although the method of collecting the sample is not mentioned, we can safely assume that the observations are independent both within and between groups. Knowing one song's valence score should not impact another song's valence score. 
+
+- Normality: Both groups have sample sizes greater than 30, and there seems to be no big outliers, so normality is met. 
+
+5. Statistical conclusion in context
+
+- From the t-test, we have the test statistic of -2.097 and p-value of 0.0376. Because the p-value is less than 0.05, we reject the null hypothesis in favor of the alternative, and conclude that we have a statistically significant evidence that there is a difference the mean valence score of instrumental and not instrumental songs. The instrumentalness does affect the songs' valence score. Under the null hypothesis, it is unlikely to see the difference in means that we did. The chance that p-value occurs as or more extreme is 3.76%. The test statistic also confirms this because it is more than two standard deviations away from the null. 
+
+
+6. Provide an interpretation of the confidence interval in context
+
+- The 95% confidence interval is -0.136 and -0.004. We are 95% confident that mean valence scores for instrumental songs are between 0.004 and 0.136 points lower than non instrumental songs. There is no 0 within the interval so we know the difference is significant. Because valence describes the musical positiveness of a track, we can also say that instrumental songs are less positive than non instrumental songs by 0.004 to 0.136 points. 
+
+## Section C: Two Proportions
+
+1. Explore two binary categorical variables in the dataset.
+
+- I chose *top10* to be binary categorical response variable and *mode* to be binary categorical explanatory variable. top10 tells whether a song is ranked in the top 10 or not. mode indicates whether a track is in a major or minor key. 
+
+- Research question: Is there a real difference in the proportion of top10 songs with major key compared to those with minor key?
+
+2. Explore and describe the relationship *between* the two variables with appropriate summary statistics.
+
+```{r}
+# Table of counts
+table(spotify$mode, spotify$top10) |> 
+  addmargins()
+
+# Table of proportions 
+table(spotify$mode, spotify$top10) |>
+  proportions(margin = 1) |> 
+  round(3)
+
+# Bar graph
+spotify |>
+ggplot(aes(x = mode, fill = top10)) +
+  geom_bar(position = "fill") +
+  labs(title = "Ranked in top 10 - Major vs. Minor",
+       x = "Mode",
+       y = "Proportion",
+       fill = "top10")
+```
+
+- From the proportion table, we see that the proportion of top 10 ranked songs with major key is less than the proportion of top 10 ranked songs with minor key.
+
+3. Perform the appropriate hypothesis test
+  
+*Hypothesis Test*
+
+- Null hypothesis: $H_0: p_{major} - p_{minor} = 0$. There is no difference in the proportion of top10 songs with major key compared to those with minor key.
+
+- Alternative: $H_A: p_{major} - p_{minor} \ne 0$. There is a difference in the proportion of top10 songs with major key compared to those with minor key.
+
+```{r}
+prop.test(x = c(22, 18), n = c(127, 73), conf.level = 0.95, 
+          alternative = "two.sided")
+```
+
+```{r}
+sqrt(1.1339)
+```
+
+- The test gives us the X-squared of 1.1339, taking the square root, we have the test statistic (z score) of 1.065. The p-value is 0.2869. The 95% confidence interval is between -0.203 and 0.056. 
+  
+4. Check assumptions/conditions for the test
+
+- There are 2 conditions for the test: Independent and Normal (Success/Failure)
+
+- Independent: Although the method of collecting the sample is not mentioned, we can safely assume that the observations are independent both within and between groups. Knowing one song's rank should not impact another song's rank.
+
+- Normal: We check for success (ranked in top 10) and failure (not in top 10) in each explanatory group. In the major group, there are 22 successes and 105 failures, both greater than 10. In the minor group, there are 18 successes and 55 failures, also greater than 10. Because there are at least 10 successes and failures in major and minor groups, the condition is met. 
+
+5. Statistical conclusion in context
+
+- We have a z-score of 1.065 and p-value of 0.2869. Because z-score is less than two standard deviations from the null and p-value is greater than 0.05, we fail to reject the null hypothesis and conclude there is not significant evidence that there is a difference in proportion of top10 songs with major key compared to those with minor key. It is likely to have the p-value as or more extreme under the the null hypothesis with the chance of 28.69%. 
+
+6. Interpretation of confidence interval
+
+- The 95% confidence interval is between -0.203 and 0.056. We are 95% confident that the proportion of top 10 songs with major keys is between 0.203 lower and 0.056 higher than the proportion of top 10 songs with minor keys. Because 0 is included in the interval, it indicates 0 is a plausible value for the difference. As with the hypothesis test, we conclude the difference is not significant. 
+
+
+## Section D: Categorical Variables
+
+1. Identify a question that can be answered with two categorical variables in the dataset. At least one of these variables will have more than two groups. Clearly state this question for a general audience, and identify the explanatory and response variable.
+
+- I chose *trend* as categorical response variable and *mode* as categorical explanatory variable. Variable *trend* describes how a song moved in the rankings since the previous week (down, up, same, or new entry). Variable *mode* indicates whether a track is in a major or minor key.  
+
+- Research question: Is there an association between genre and trend? 
+
+2. Explore and describe the relationship *between* the two variables with appropriate summary statistics.  Provide one plot and one sentence about the relationship (supported by summary stats).
+
+```{r}
+#Table of counts
+table(spotify$mode, spotify$trend) |>
+  addmargins()
+
+#Table of proportions
+table(spotify$mode, spotify$trend) %>%
+  proportions(margin = 1) %>%
+  round(3)
+
+spotify |>
+ggplot(aes(x = mode, fill = trend)) + 
+  geom_bar(position = "fill")+
+  labs(x = "Mode", 
+       y = "Proportion",
+       fill = "Trend",
+       title = "Trend in rankings from previous week - Major vs. Minor ")
+
+```
+
+- From the EDA, it seems that there are less songs with major key staying in the same position of rankings since the previous week than songs with minor key. 
+
+** I saw that table of counts have a column for "New_entry" songs. This means there are 5 songs that don't have a ranking from previous week to have a comparison, so I decided to take out this column out. We have new table of counts, table of proportions and bar graph. 
+
+```{r}
+spotify_new <- spotify |>
+  filter(trend != "NEW_ENTRY")
+```
+
+```{r}
+#Table of counts
+table(spotify_new$mode, spotify_new$trend) |>
+  addmargins()
+
+#Table of proportions
+table(spotify_new$mode, spotify_new$trend) %>%
+  proportions(margin = 1) %>%
+  round(3)
+
+spotify_new |>
+ggplot(aes(x = mode, fill = trend)) + 
+  geom_bar(position = "fill")+
+  labs(x = "Mode", 
+       y = "Proportion",
+       fill = "Trend",
+       title = "Trend in rankings from previous week - Major vs. Minor ")
+```
+
+3. Perform the appropriate hypothesis test
+  
+*Hypothesis Test*
+
+- Null hypothesis: $H_0:$ There is no association between mode and trend.
+
+- Alternative: $H_A:$ There is an association between mode and trend.
+
+```{r}
+table(spotify_new$mode, spotify_new$trend) %>%
+  chisq.test()
+```
+
+- Our chi-square statistic from our data is 0.911. The p-value from the chi-square distribution with 2 degrees of freedom is 0.6341.
+
+4. Check assumptions/conditions for the test.
+
+- There are 2 conditions for the test: Independent and Expected counts greater than 5.
+
+- Independent: Although the method of collecting the sample is not mentioned, we can safely assume that the observations are independent both within and between groups.
+
+- Expected Counts: The conditions are met since the expected counts are over 5 for each cell.
+
+```{r}
+table(spotify_new$mode, spotify_new$trend) %>%
+  chisq.test() %>%
+  .$expected
+```
+
+5. Conclusion
+
+- Our p-value is 0.6341, which is greater than 0.05. Because of that, we fail to reject the null hypothesis and conclude that there is no association between mode and trend, that these two variables are independent. Under the null hypothesis, it is very likely to observe the p-value as or more extreme with the chance of 63.41%. Therefore, we know that the mode of a song does not affect its rankings. 
+
+## Section E: Conclusion and Figure Caption
+
+*Summary*:
+
+- Based on the analyses, we explored the relationships between song characteristics on Spotify such as mode, instrumentalness and valence score. First, we observed a statistically significant difference in the mean valence scores between instrumental and non-instrumental songs. Instrumental songs were found to be slightly less positive, with their valence scores estimated to be between 0.004 and 0.136 points lower, based on a 95% confidence interval. This finding suggests that instrumentalness does have a measurable effect on a song’s positiveness. Second, when comparing the proportion of top 10 songs in major keys versus minor keys, we did not find significant evidence of a difference. The results indicated that any variation could be due to chance, and the 95% confidence interval (-0.203 to 0.056) includes 0, reinforcing that the difference is not meaningful. Finally, we found that a song’s mode (major or minor) does not appear to influence its ranking trends. This conclusion is supported by the data, which showed no significant association, suggesting that mode and trend are independent. The second and third analyses have *mode* as explanatory variable, and in both cases, we fail to reject the null hypothesis, showing that the mode of a song doesn't influence other characteristics of Spotify songs. While these conclusions are based on statistical evidence, it’s important to recognize potential limitations, such as the sample of songs in the dataset. Instead of picking the top 50 songs, we can randomly pick 50 songs throughout the four points in a year. This way can make sure that observations are indeed independent. We cannot generalize conclusions to a population (all Spotify songs) and make causal conclusions because it is not a random sample and there is no random assignment of explanatory variable. 
+
+```{r, fig.cap="There is a statistically significant difference in the mean valence scores between instrumental and non-instrumental songs. Instrumental songs were found to be slightly less positive, with their valence scores estimated to be between 0.004 and 0.136 points lower, based on a 95% confidence interval. The data set features the top 50 songs on Spotify from 4 points during the year 2021 (Jan 1, Apr 1, July 1, Oct 1). Statistics performed by unpaired t-test with Welch correction. Sample size is 200, test statistics is -2.0974, and p-value is 0.0376."}
+spotify |>
+  ggplot(aes(y = valence, x = instrumentalness, fill = instrumentalness)) +
+  geom_boxplot(width = 0.25) +
+  geom_jitter(width = 0.05, alpha = 0.5) +
+  theme(legend.position = "none") +
+  labs(title = "Valence Score - Instrumental vs. Not Instrumental",
+       x = "Instrumentalness",
+       y = "Valence Score") + coord_flip()
+```

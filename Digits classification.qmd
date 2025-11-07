@@ -1,0 +1,379 @@
+---
+title: "Handwritten Digits Classification"
+subtitle: "Supervised Machine Learning"
+author: "Henry Black, Nhi Luong, James Le"
+date: "10/14/2025"
+output:
+  pdf_document: default
+  html_document: default
+editor_options:
+  chunk_output_type: console
+---
+
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(warning=FALSE, message=FALSE)
+library(tidyverse)
+library(dslabs)
+library(tidymodels)
+tidymodels_prefer(quiet=TRUE)
+library(kknn)
+library(usemodels)
+```
+
+## Auxiliary functions
+
+* Here we will include all of the functions that we will use in this project.
+
+```{r}
+plot_digit <- function(row) {
+  digit_mat <-  row |>
+    select(-digit)|>
+    as.numeric()|>
+    matrix(nrow = 28)
+  
+  image(digit_mat[,28:1])
+}
+```
+
+- plot_digit(): This function takes in a row of the 'mnist' dataset, removes the 'digit' column, turns the row into a vector using 'as.numeric()' function, and then turns it into a 28 by 28 matrix. Finally, it plots the matrix using the function 'image()'. 
+
+
+```{r out.width="30%"}
+plot_region <- function(tbl) {
+  digit_mat <- as.matrix(tbl)*128 # Convert tbl into matrix and assign gray=128
+
+  image(t(digit_mat)[,28:1]) #Plot the image making sure is rotated
+}
+
+#plot_region(region1_class)
+```
+
+- plot_region(): produce a plot where the pixel of the region of interest is distinguish from the rest of the matrix. It does so through assigning the pixel value of all of the matrix as gray then using a different color for the region of interest. It also make sure that the plot is rotated correctly.
+
+
+```{r}
+calc_prop <- function (region, row) {
+  # Take row from mnist and transform into a "digit" matrix
+  digit_mat <-  row |>
+    as.numeric()|>
+    matrix(nrow = 28) |>
+    t()
+  # Find positions of pixels from "region"
+  pos = (region==1)
+  # Subset "digit" to the positions and count dark pixels (grey>20)
+  dark = digit_mat[pos]>20 
+  # Return proportion of dark pixels of "image" in "region"
+  return(sum(dark)/sum(pos))
+}
+```
+
+- This function, calc_prop takes a region and a row as arguments and returns the proportion of dark pixels in each region. It does this by taking your dataset as a row and then calculating an proportion of "dark pixels" which it defines as a value of over 20 for grey.
+
+## Region description
+
+**Here we define the two regions that we will be using to predict the correct digit.**
+
+- Reasons for using these two regions: Typically, the top and bottom of 4 have points and not many pixels in a horizontal line as opposed to 3 that has a lot. We made region2 curved because typically, a lot of 3s are more curved on the bottom than on the top. We didn't choose the region in the middle because 3s and 4s often overlap a lot in the middle.
+
+```{r}
+region1 <- read_csv("~/Downloads/region1.csv", col_names = FALSE)
+region2 <- read_csv("~/Downloads/region2.csv", col_names = FALSE)
+plot_region(region1)
+plot_region(region2)
+```
+
+
+## Image dataset
+
+* Here we create our dataset by filtering `mnist` to include only our two digits of interest and 1000 observations.
+
+```{r}
+mnist3_4 <- read_csv("~/Downloads/mnist.csv.gz") |>
+  mutate(digit=as.factor(digit)) |>
+  filter(digit %in% c(3,4)) |>
+  slice_head(n = 1000)
+```
+
+
+## Feature dataset
+
+In this section, we have created a dataset called 'features_tbl' that includes four columns (id, digit, prop1, and prop2). Column 'id' contains consecutive number from 1 to 1000. 'digit' is a factor corresponding to digit 3 and digit 4. We calculated the proportion of dark pixels for 'region1' and saved the values in column 'prop1'. We did the same calculation for 'region2' and saved the values under column 'prop2'.
+
+```{r}
+features_tbl <- mnist3_4|>
+  mutate(id = row_number()) |>
+  rowwise()|>
+  mutate(prop1 = calc_prop(region1,c_across(V1:V784)),
+         prop2 = calc_prop(region2,c_across(V1:V784)),
+         digit = as.factor(digit)) |>
+  mutate(digit = fct_drop(digit)) |>
+  ungroup()|>
+  select(id, digit, prop1, prop2)
+```
+
+
+## Initial plotting
+
+**Here we generate a plot of `prop1` versus `prop2` and use color to represent the two digit types.**
+
+```{r}
+features_tbl |>
+  ggplot(aes(prop1, prop2, color = digit)) +
+  geom_jitter(alpha = 0.6)
+```
+
+- Our dataset looks pretty separate and distinguishable. There are 2 distinct clusters for 3 and 4. There are some outliers that mixed into the other cluster but not many. 
+
+----
+
+## Training/Testing definition
+
+**Here, we use our features dataset (see section `Feature Dataset`) to create our training and testing datasets.**
+
+* We first create an 80/20 split for our testing and training data sets.
+```{r}
+set.seed(12345)
+features_split <- initial_split(features_tbl, prop = .8)
+features_train_tbl <- training(features_split)
+features_test_tbl <- testing(features_split)
+```
+
+## Model creation, optimization and selection
+
+* We next create a KNN model for distinguishing the two different digit types using our two defined features.
+
+```{r, results='hide'}
+use_kknn(formula=digit~prop1+prop2, 
+         data = features_train_tbl, 
+         prefix = "features")
+```
+
+**We then create our cross validation data set using the default value of 10 folds. Additionally we create a grid which contains both the values of k that we wish to test, along with the 4 different weight functions that we want to test in combination with our k values.**
+
+```{r, results='hide'}
+set.seed(12345)
+features_cv <- vfold_cv(features_train_tbl)
+
+features_neighbors <- grid_regular(
+  neighbors(range = c(1, 50)),
+  weight_func(values = c("rectangular", "triangular", "inv", "cos")),
+  levels = 10
+)
+```
+
+**Next, we create and tune our workflow for both our optimal k and our optimal workflow.**
+
+**We decided to tune both of these parameters at the same time to make sure that there was not a scenario where the optimal k for one weight function was not the optimal k for another one.**
+
+1. *Rectangular*: This function is the most basic of all of them. It assigns all distances to the nearest neighbors a weight of 1, so all values are weighted equally, regardless of how far they are from the unknown point.
+
+2. *Triangular*: The neighbors are weighted based on their triangular distance. As you move away from the point of interest, the weight assigned to neighboring data points decreases.
+
+3. *Inverse*: This weight function is somewhat similar in spirit to the triangular weight function, where neighbors closer to the unknown point are given a higher weight, but the way that it does this is somewhat different. With this function, values are given a weight which is $\frac{1}{d}$ where $d$ is the distance that that point is from the unkown. In essence, values closer to the unknown get a higher weight than the ones that are farther away.
+
+4. *Cos*: Similarly to triangular but the distance would be transform to $cos(d)$ for weight. This makes closer points weighted more than point further away within a cosine curve
+
+```{r}
+features_recipe <- 
+  recipe(formula = digit ~ prop1 + prop2, data = features_train_tbl) |>
+  step_zv(all_predictors()) |>
+  step_normalize(all_numeric_predictors()) 
+
+features_spec <- 
+  nearest_neighbor(neighbors = tune(), weight_func = tune()) |>
+  set_mode("classification") |>
+  set_engine("kknn") 
+
+features_workflow <- 
+  workflow() |>
+  add_recipe(features_recipe) |>
+  add_model(features_spec) 
+
+set.seed(12345)
+features_tune <-
+  tune_grid(features_workflow, 
+            resamples = features_cv,
+            grid = features_neighbors)
+
+autoplot(features_tune, metric="accuracy")
+```
+
+```{r}
+collect_metrics(features_tune) |>
+  filter (.metric=="accuracy") |>
+  slice_max(mean, n=5)
+```
+
+**Our final conclusion shows that we have k optimized to 6 and the optimal weight function is the rectangular weight function.**
+
+**Next, we need to finalize our workflow and fit our model.**
+
+```{r}
+show_best(features_tune, metric="accuracy")
+(opt_k_wfunc <- select_best(features_tune, metric = "accuracy"))
+
+features_knn_wf <- finalize_workflow(features_workflow, opt_k_wfunc)
+
+features_knn_model <- fit(features_knn_wf, features_train_tbl)
+```
+
+**Finally, we can calculate our accuracy and view our confusion matrix to see how well our model works.**
+
+```{r}
+augment(features_knn_model, features_test_tbl) |>
+  metrics(.pred_class, digit)
+augment(features_knn_model, features_test_tbl) |>
+  conf_mat(truth = digit, estimate = .pred_class)
+```
+
+**Our final accuracy is 95% and we correctly classify 86 out of 96 3's and 104 out of 104 4's in the dataset.**
+
+## Decision boundary
+
+* Here we plot our model predictions decision boundary across a expand grid of `prop1` and `prop2` 
+
+```{r, results='hide'}
+(p1_vec = seq(0,1, by=0.01))
+(p2_vec = seq(0.0,1, by=0.01))
+(grid_tbl <- expand_grid(prop1=p1_vec, prop2=p2_vec))
+```
+
+
+```{r}
+augment(features_knn_model, grid_tbl) |>
+  ggplot(aes(prop1, prop2, fill = .pred_class)) +
+  geom_raster() +
+  labs(title = "Decision Boundary of Model Predictions",
+       fill = "Prediction Class")
+```
+
+* Here we can see that the decision boundary of our model matches up very closely to the true values of 3's and 4's that we plotted earlier in this report.
+
+## Misclassifications
+
+**We are now interested in the few numbers that our model misclassified. Interestingly enough, our model had a 100% True Negative Rate, or in other words, it predicted that the true value was a 4 correctly every time. However, it did mess up a fair amount of the 3s, so we will now plot some of them and attempt to understand why the model misclassified them.**
+
+```{r}
+miss_class <- augment(features_knn_model, features_test_tbl) |> 
+  filter(.pred_class != digit) 
+
+# Plot 1
+plot_digit(mnist3_4[427,]) # 3 miss classified as 4
+# Plot 2
+plot_digit(mnist3_4[386,]) # 3 miss classified as 4
+```
+
+* We plot two digits 3 misclassified as 4, we got a perfect 4 classifier, and this might be due to chance thanks to the similarity between the training and testing dataset.
+
+Miss Classification Reason:
+
+**These digits got misclassified because of unusual handwritings. In the first plot, the handwritten 3 is tilted, missing the top and some bottom regions. In the second plot, the handwritten digit misses pretty much the top region. The bad handwriting with angled orientation that might overlap the regions we selected in unexpected way**
+
+```{r}
+# 3 miss classified as 4 proportions
+features_tbl |>  
+  filter(id %in% c(427,386)) |>
+  select(id, prop1, prop2)
+
+```
+
+* The above code shows the proportion values of region 1 and 2 for digit with id 386 and id 427.
+
+```{r}
+# Probability
+miss_class |>
+  filter(id %in% c(427,386)) |>
+  select(id, .pred_class, .pred_3, .pred_4)
+```
+
+* Here we see that the model gives the digit with id 386 a 1 in 3 chance of being a 3 and a 2 in 3 chance of being a 4, which is wrong, but also explains why the digit was misclassified. Similarly with the other digit, but even worse, the model gaave it a 100% chance of being a 4, even though it was a 3.
+
+
+## Changing things up
+
+* We have pulled 500 digit `5s` from `mnist` dataset, saved it under 'mnist_5' and then binded with the previous 'mnist3_4' dataset by rows. The resulting dataset is called 'mnist3_4_5'.
+
+```{r}
+mnist <- read_csv("~/Downloads/mnist.csv.gz") 
+mnist_5 <- mnist|>
+  mutate(digit=as.factor(digit)) |>
+  filter(digit %in% c(5)) |>
+  slice_head(n = 500)
+
+mnist3_4_5 <- bind_rows(mnist3_4, mnist_5) # bind 2 datasets
+```
+
+
+* We then calculated 'prop1' and 'prop2' on the new previous dataset like we did as the beginning of the project.
+
+```{r}
+mnist_3_4_5.features <- mnist3_4_5|>
+  mutate(id = row_number()) |>
+  rowwise()|>
+  mutate(prop1 = calc_prop(region1,c_across(V1:V784)),
+         prop2 = calc_prop(region2,c_across(V1:V784)),
+         digit = as.factor(digit)) |>
+  mutate(digit = fct_drop(digit)) |>
+  ungroup()|>
+  select(id, digit, prop1, prop2)
+```
+
+* We splitted the previous dataset into training/testing datasets that have 1200 and 300 observations respectively.
+
+```{r}
+set.seed(101325)
+mnist345_features_split <- initial_split(mnist_3_4_5.features, prop = .8)
+mnist345_features_train <- training(mnist345_features_split)
+mnist345_features_test <- testing(mnist345_features_split)
+```
+
+* We then re-trained the model using the new training dataset without optimizing parameters 'k' and 'weight_func'.
+
+```{r}
+mnist345_features_recipe <- 
+  recipe(formula = digit ~ prop1 + prop2, data = mnist345_features_train)
+
+mnist345_features_spec <- 
+  nearest_neighbor() |>
+  set_mode("classification") |>
+  set_engine("kknn") 
+
+mnist345_features_workflow <- 
+  workflow() |>
+  add_recipe(mnist345_features_recipe) |>
+  add_model(mnist345_features_spec) 
+```
+
+* Below is the accuracy and confusion matrix of our retrained model.
+
+```{r}
+mnist345_model <- fit(mnist345_features_workflow, mnist345_features_train)
+
+# Accuracy overall
+augment(mnist345_model, mnist345_features_test) |>
+  metrics(.pred_class, digit)
+
+# Accuracy by each digit
+augment(mnist345_model, mnist345_features_test) |>
+  group_by(digit) |>
+  metrics(.pred_class, digit)
+
+augment(mnist345_model, mnist345_features_test) |>
+  conf_mat(.pred_class, digit)
+```
+
+**The confusion matrix of the model shows that digit 3 and 5 get confused more with 35 and 33 miss classifications respectively. We see that 3 gets miss classified as 5 the most and 5 gets miss classified as 3 the most because digit 3 and 5 share similar regions that were chosen as region 1 and 2. The both overlap at the top and bottom regions.**
+
+* Finally, we plot the decision boundary for the retrained model. 
+
+```{r}
+augment(mnist345_model, grid_tbl) |>
+  ggplot(aes(prop1, prop2, fill = .pred_class)) +
+  geom_raster() +
+  labs(title = "Decision Boundary of Model Predictions",
+       subtitle = "Digits 3,4,5",
+       fill = "Prediction Class")
+```
+
+* We can see here that the decision boundary here is a lot less clean, which makes sense, as we did not create our regions with the purpose of descriminating between digit 5 and our other numbers. However, there are still some regions that we can block off for each number.
