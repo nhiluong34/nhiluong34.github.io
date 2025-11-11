@@ -4,7 +4,7 @@ about:
   template: trestles
   links: 
     - text: LinkedIn
-      href: www.linkedin.com/in/nhi-luong-40a80a298
+      href: https://www.linkedin.com/in/nhi-luong-40a80a298/
     - text: GitHub
       href: https://github.com/nhiluong34
     - text: Email
