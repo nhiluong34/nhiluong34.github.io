@@ -1,12 +1,12 @@
 ---
-title: "Map states-related"
+title: "Cool States Maps!"
 format: html
 editor: visual
 editor_options: 
   chunk_output_type: console
 ---
 
-```{r}
+```{r, echo=FALSE, results='hide', warning=FALSE, message=FALSE}
 library(rvest)
 library(sf)
 library(polite)
@@ -16,43 +16,58 @@ library(htmltools)
 library(glue)
 library(tidyverse)
 library(janitor)
-```
-
-# USA States
-```{r}
 library(usa)
-#states
 ```
 
-# Static Numerical
+## USA States Description
 
-```{r}
+- For the map assignment, I chose the dataset `states` from the library `usa`. This dataset gives a description of each US state such as `name`, `region`, `division` and `area`. I chose `area` as numerical variable for the first map and `division` as categorical variable for the second map.
+
+### Load in the dataset
+
+- Let's take a quick look at the first five states of the dataset.
+
+```{r, echo=FALSE}
+head(states)
+```
+
+- I loaded in the mapping dataset sf and performed a left join with the dataset `states`. I decided to exclude Alaska, Puerto Rico and Hawaii.
+
+```{r, echo=FALSE}
 states_sf <- 
   read_sf("https://rstudio.github.io/leaflet/json/us-states.geojson") |>
   select(name, geometry)
 
-states_sf |>
+states_sf <- states_sf |>
   filter(!name %in% c("Hawaii", "Alaska", "Puerto Rico")) |>
-  left_join(states) |>
-  ggplot() +
+  left_join(states)
+```
+
+### Area of Each State (Static)
+
+- The following map shows the area of each state in square miles. For this static map, I used the sf mapping dataset. 
+
+```{r}
+states_sf |>
+ ggplot() +
   geom_sf(aes(fill = area), colour = "white", linetype = 1) + 
-  #geom_sf_text(aes(label = name)) +
   theme_void() +
-  scale_fill_gradient(low = "lightblue", high = "lightblue4") +
-  labs(title = "Area of Each State",
+  scale_fill_gradient(low = "lightblue", high = "darkblue") +
+  labs(title = "Area of US States",
        fill = "Square miles") +
   theme(plot.title = element_text(hjust = 0.5))
 ```
 
-# Interactive Numerical
+- Insights: This map shows Texas has the largest area approximately 250,000 square miles. California and Montana followed after Texas to have a large area around 200,000 square miles. States on the east side of the US in both the north and south have much smaller area compared to states in the west side. 
+
+### Area of Each State (Interactive)
+
+- Here, I turned the static map into an interactive map where users can hover over each state to view the state name and its corresponding area.
 
 ```{r}
 area_sf <- states_sf |>
-  filter(!name %in% c("Hawaii", "Alaska", "Puerto Rico")) |>
-  left_join(states)
-
-area_sf <- area_sf |>
   mutate(labels = str_c(name, ": ", area, " sq mile"))
+
 labels <- lapply(area_sf$labels, HTML)
 
 pal <- colorNumeric(
@@ -85,29 +100,34 @@ leaflet(area_sf) |>
     position = "bottomright")
 ```
 
-# Static Categorical
+### State Division (Static)
+
+- The following map shows the Census Bureau division of each state. For this static map, I used the polygon mapping dataset. 
 
 ```{r}
 states_polygon <- as_tibble(map_data("state")) |>
   select(region, group, order, lat, long)
 ```
 
+- I defined my own color pallete for each division. 
+
 ```{r}
 distinct_colors <- c(
-  "#e41a1c",  # red
-  "#377eb8",  # blue
-  "#4daf4a",  # green
-  "#984ea3",  # purple
-  "#ff7f00",  # orange
-  "#ffff33",  # yellow
-  "#a65628",  # brown
-  "#f781bf",  # pink
-  "#66c2a5"   # teal
+  "#e41a1c",  
+  "#377eb8",
+  "#4daf4a",
+  "#984ea3",  
+  "#ff7f00", 
+  "#ffff33", 
+  "#a65628", 
+  "#f781bf",
+  "#66c2a5" 
 )
+```
 
+```{r}
 states |>
   mutate(name = str_to_lower(name)) |>
-  filter(!name %in% c("hawaii", "alaska", "puerto rico")) |>
   select(-lat, -long) |>
   right_join(states_polygon, join_by(name == region)) |>
   ggplot(mapping = aes(x = long, y = lat,
@@ -121,15 +141,15 @@ states |>
   theme(plot.title = element_text(hjust = 0.5))
 ```
 
-# Interactive categorical
+- Insights: From the map, I see that the Pacific division consists of three states and this is the smallest number of states in a division. Mountain and South Atlantic divisions seem to have about the same number of states. I think a possible explanation for the number of states in a division could be due to the population of each state.  
+
+### State Division (Interactive)
+
+- Here, I turned the static State Division map into an interactive map so users can hover above each state to see state name and its division. 
 
 ```{r}
 division_sf <- states_sf |>
-  filter(!name %in% c("Hawaii", "Alaska", "Puerto Rico")) |>
-  left_join(states) 
-
-division_sf <- division_sf |>
-  mutate(labels = str_c("Division: ", division))
+  mutate(labels = str_c("State: ", name,"<br>Division: ", division))
 
 division_labels <- lapply(division_sf$labels, HTML)
 
@@ -160,4 +180,3 @@ leaflet(division_sf) |>
       textsize = "15px",
       direction = "auto"))
 ```
-
