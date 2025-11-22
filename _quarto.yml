@@ -7,6 +7,12 @@ website:
     left:
       - href: index.qmd
         text: Home
+      - text: "SDS 264 Projects"
+        menu: 
+          - text: "Mini-Project 1"
+            href: Airline Customer Reviews Analysis.qmd
+          - text: "Choropleth maps"
+            href: States map.qmd
       - text: "Data Science Projects"
         menu:
           - text: "Korean Drama Analysis"

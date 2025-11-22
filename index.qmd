@@ -13,8 +13,7 @@ about:
 
 ## About Me
 
-Hello! I'm Nhi. I'm an undergraduate student studying Mathematics, Data Science, and Chinese at St. Olaf College. I love learning about text and sentiment analysis and predictive models for transportation-related problems.
-My journey in data science has just begun and I'm very excited to see what's ahead!
+Hello! I'm Nhi. I'm an undergraduate student studying Mathematics, Data Science, and Chinese at St. Olaf College. I love learning about text and sentiment analysis. My journey in data science has just begun and I'm very excited to see what's ahead!
 
 Outside of academia, I collect a lot of Lego sets and my favorite themes are Architecture and Technic. I also like to travel abroad as well.
 

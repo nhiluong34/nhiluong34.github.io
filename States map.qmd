@@ -1,0 +1,163 @@
+---
+title: "Map states-related"
+format: html
+editor: visual
+editor_options: 
+  chunk_output_type: console
+---
+
+```{r}
+library(rvest)
+library(sf)
+library(polite)
+library(viridis)
+library(leaflet)
+library(htmltools)
+library(glue)
+library(tidyverse)
+library(janitor)
+```
+
+# USA States
+```{r}
+library(usa)
+#states
+```
+
+# Static Numerical
+
+```{r}
+states_sf <- 
+  read_sf("https://rstudio.github.io/leaflet/json/us-states.geojson") |>
+  select(name, geometry)
+
+states_sf |>
+  filter(!name %in% c("Hawaii", "Alaska", "Puerto Rico")) |>
+  left_join(states) |>
+  ggplot() +
+  geom_sf(aes(fill = area), colour = "white", linetype = 1) + 
+  #geom_sf_text(aes(label = name)) +
+  theme_void() +
+  scale_fill_gradient(low = "lightblue", high = "lightblue4") +
+  labs(title = "Area of Each State",
+       fill = "Square miles") +
+  theme(plot.title = element_text(hjust = 0.5))
+```
+
+# Interactive Numerical
+
+```{r}
+area_sf <- states_sf |>
+  filter(!name %in% c("Hawaii", "Alaska", "Puerto Rico")) |>
+  left_join(states)
+
+area_sf <- area_sf |>
+  mutate(labels = str_c(name, ": ", area, " sq mile"))
+labels <- lapply(area_sf$labels, HTML)
+
+pal <- colorNumeric(
+  palette = c("darkseagreen1", "darkseagreen4"),
+  domain = area_sf$area
+)
+
+leaflet(area_sf) |>
+  setView(-96, 37.8, 4) |>
+  addTiles() |>
+  addPolygons(
+    fillColor = ~pal(area),
+    weight = 2,
+    opacity = 1,
+    color = "white",
+    dashArray = "3",
+    fillOpacity = 0.7,
+    highlightOptions = highlightOptions(
+      weight = 5,
+      color = "#666",
+      dashArray = "",
+      fillOpacity = 0.7,
+      bringToFront = TRUE),
+    label = labels,
+    labelOptions = labelOptions(
+      style = list("font-weight" = "normal", padding = "3px 8px"),
+      textsize = "15px",
+      direction = "auto")) |>
+  addLegend(pal = pal, values = ~area, opacity = 0.7, title = NULL,
+    position = "bottomright")
+```
+
+# Static Categorical
+
+```{r}
+states_polygon <- as_tibble(map_data("state")) |>
+  select(region, group, order, lat, long)
+```
+
+```{r}
+distinct_colors <- c(
+  "#e41a1c",  # red
+  "#377eb8",  # blue
+  "#4daf4a",  # green
+  "#984ea3",  # purple
+  "#ff7f00",  # orange
+  "#ffff33",  # yellow
+  "#a65628",  # brown
+  "#f781bf",  # pink
+  "#66c2a5"   # teal
+)
+
+states |>
+  mutate(name = str_to_lower(name)) |>
+  filter(!name %in% c("hawaii", "alaska", "puerto rico")) |>
+  select(-lat, -long) |>
+  right_join(states_polygon, join_by(name == region)) |>
+  ggplot(mapping = aes(x = long, y = lat,
+                          group = group)) +
+  geom_polygon(aes(fill = division), color = "black", linewidth = 0.2) +
+  theme_void() +
+  coord_map() +
+  scale_fill_manual(values = distinct_colors) +
+  labs(title = "Census Bureau Division of the US",
+       fill = NULL) +
+  theme(plot.title = element_text(hjust = 0.5))
+```
+
+# Interactive categorical
+
+```{r}
+division_sf <- states_sf |>
+  filter(!name %in% c("Hawaii", "Alaska", "Puerto Rico")) |>
+  left_join(states) 
+
+division_sf <- division_sf |>
+  mutate(labels = str_c("Division: ", division))
+
+division_labels <- lapply(division_sf$labels, HTML)
+
+pal_division <- colorFactor(
+  palette = distinct_colors,
+  domain = division_sf$division
+)
+
+leaflet(division_sf) |>
+  setView(-96, 37.8, 4) |>
+  addTiles() |>
+  addPolygons(
+    fillColor = ~pal_division(division),
+    weight = 2,
+    opacity = 1,
+    color = "white",
+    dashArray = "3",
+    fillOpacity = 0.7,
+    highlightOptions = highlightOptions(
+      weight = 5,
+      color = "#666",
+      dashArray = "",
+      fillOpacity = 0.7,
+      bringToFront = TRUE),
+    label = division_labels,
+    labelOptions = labelOptions(
+      style = list("font-weight" = "normal", padding = "3px 8px"),
+      textsize = "15px",
+      direction = "auto"))
+```
+
