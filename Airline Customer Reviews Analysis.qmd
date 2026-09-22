@@ -24,7 +24,7 @@ library(wordcloud)
 
 # Data Wrangling
 
-After loading the original dataset, I created a smaller dataset with fewer columns since other columns have a lot of missing data. Using str_replace() with two different regular expressions, I was able to make column 'review_date' and 'customer_review' cleaner. Then, using str_trim() and str_match() to first clean up column 'route' and then divide the column into three new columns called 'origin', 'destination', and 'transit'. The resulting dataset has 39,604 observations and 10 variables. Each observation is a review of a customer.
+After loading the original dataset, I created a smaller dataset with fewer columns since other columns have a lot of missing data. Using str_replace() with two different regular expressions, I was able to make column 'review_date' and 'customer_review' cleaner. Then, using str_trim() and str_match() to first clean up column 'route' and then divide it into three new columns called 'origin', 'destination', and 'transit'. The resulting dataset has 39,604 observations and 10 variables. Each observation is a review of a customer.
 
 ```{r}
 airline <- read_excel("~/Downloads/capstone_airline_reviews3.xlsx")

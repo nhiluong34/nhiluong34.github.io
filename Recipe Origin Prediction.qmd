@@ -28,10 +28,11 @@ library(readr)
 library(textrecipes)
 library(vip)
 library(usemodels)
+library(ranger)
 ```
 
 ```{r, message=FALSE}
-cuisines <- read_csv("~/Sds_341_F25/Project/group_2/Challenge_2/cuisines.csv")
+cuisines <- read_csv("~/Desktop/git/nhiluong34.github.io/cuisines.csv")
 ```
 
 # Introduction

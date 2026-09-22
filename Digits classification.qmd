@@ -89,7 +89,7 @@ plot_region(region2)
 * Here we create our dataset by filtering `mnist` to include only our two digits of interest and 1000 observations.
 
 ```{r}
-mnist3_4 <- read_csv("~/Downloads/mnist.csv.gz") |>
+mnist3_4 <- read_csv("~/Desktop/git/nhiluong34.github.io/mnist.csv.gz") |>
   mutate(digit=as.factor(digit)) |>
   filter(digit %in% c(3,4)) |>
   slice_head(n = 1000)
@@ -295,7 +295,7 @@ miss_class |>
 * We have pulled 500 digit `5s` from `mnist` dataset, saved it under 'mnist_5' and then binded with the previous 'mnist3_4' dataset by rows. The resulting dataset is called 'mnist3_4_5'.
 
 ```{r}
-mnist <- read_csv("~/Downloads/mnist.csv.gz") 
+mnist <- read_csv("~/Desktop/git/nhiluong34.github.io/mnist.csv.gz")
 mnist_5 <- mnist|>
   mutate(digit=as.factor(digit)) |>
   filter(digit %in% c(5)) |>

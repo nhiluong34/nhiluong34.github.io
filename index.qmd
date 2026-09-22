@@ -11,9 +11,9 @@ about:
     - text: GitHub
       href: https://github.com/nhiluong34
     - text: Asian Studies Porfolio
-      href: https://luong2.wixsite.com/my-sites
+      href: https://luong2.wixsite.com/my-site
     - text: Email
-      href: mailto: luongwork27@gmail.com
+      href: mailto:luongwork27@gmail.com
 ---
 
 ## About Me
