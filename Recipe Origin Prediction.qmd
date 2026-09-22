@@ -1,0 +1,312 @@
+---
+title: "Recipe Origin Prediction"
+subtitle: "Applying Random Forest and LASSO Models"
+author: "James Le, Nhi Luong, Henry Black"
+date: "December 08, 2025"
+output:
+  pdf_document: default
+  html_document: default
+  word_document: default
+editor_options:
+  chunk_output_type: console
+---
+```{r setup, include = FALSE}
+knitr::opts_chunk$set(warning=FALSE, message=FALSE, echo = FALSE,
+                      fig.width = 5, fig.height = 3, dpi = 200)
+```
+
+```{r, include = FALSE}
+library(tidyverse)
+library(tidymodels)
+library(gtsummary)
+options(gtsummary.tbl_summary.print = "inline")
+library(rpart)
+library(rpart.plot)
+library(tokenizers)
+library(dplyr)
+library(readr)
+library(textrecipes)
+library(vip)
+library(usemodels)
+```
+
+```{r, message=FALSE}
+cuisines <- read_csv("~/Sds_341_F25/Project/group_2/Challenge_2/cuisines.csv")
+```
+
+# Introduction
+
+In the culmination of our work this semester, we were hungry for a dataset that would let us apply our newly-learn modeling skills in a meaningful and interesting way. The dataset we selected to satisfy that hunger was, perhaps fittingly, one centered entirely around food. Specifically, we worked with a collection of 2,218 recipes from Allrecipes.com, covering dishes posted between 2009 and 2025 and curated by Brian Mubia. Each observation includes a substantial number of variables: country of origin, nutritional information, serving sizes, cooking and preparation times, user-generated ratings and reviews and most significantly, a list of the ingredients used in the recipe. Our primary goal is to develop a model that predicts the continent of origin for each recipe based on the information provided in the recipe entry. 
+
+Before beginning any modeling, we first worked on some data-wrangling to prepare the recipe dataset for analysis. Although the original dataset was already relatively clean, we introduced an important new variable continent, which grouped each recipe’s country of origin into a broader regional category. After reviewing the distribution of these categories, we restricted our analysis to the three continents with the highest counts: Asia, Europe, and North America. This step allowed us to focus on the groups with the most data and avoid instability from sparsely represented regions. We then removed variables that were irrelevant to our modeling goal or redundant by definition, such as name, author, url, and the separate prep_time and cook_time variables, since total_time already captured their combined effect. Finally, we converted the new continent variable into a factor, dropped observations containing missing values, and retained only the predictors that would contribute to classification. This wrangling stage ensured that the dataset was structured, consistent, and aligned with the questions we aimed to answer.
+
+## Wrangle dataset
+
+```{r, include = FALSE}
+cuisines_clean <- cuisines |>
+  mutate(continent = case_when(
+    country %in% c("Cajun and Creole", "Canadian", "Puerto Rican", "Soul Food", "Southern Recipes", "Tex-Mex", "Amish and Mennonite", "Cuban", "Jamaican") ~ "North America",
+    country %in% c("Argentinian", "Brazilian", "Chilean", "Colombian", "Peruvian") ~ "South America",
+    country %in% c("Austrian", "Belgian", "Danish", "Dutch", "Finnish", "French", "German", "Greek", "Italian", "Norwegian", "Polish", "Portuguese", "Russian", "Scandinavian", "Spanish", "Swedish", "Swiss") ~ "Europe",
+    country %in% c("Bangladeshi", "Chinese", "Filipino", "Indian", "Indonesian", "Israeli", "Japanese", "Korean", "Lebanese", "Malaysian", "Pakistani", "Persian", "Thai", "Turkish", "Vietnamese") ~ "Asia",
+    country == "South Africa" ~ "Africa",
+    country == "Australian and New Zealander" ~ "Oceania",
+    country == "Jewish" ~ "Multiple Regions"))
+```
+
+- The `cuisines` dataset is already clean so there was not any cleaning step involved. Our group did create a new variables called `continent` that groups different countries under specific continent. 
+
+```{r, echo = F}
+cuisines_clean |> count(continent, sort = T) |> 
+  kableExtra::kable(caption = "The number of recipies in the dataset from each Continent")
+```
+
+- To create the data set for model building, we chose three continents with the highest number of counts and they are Asia, Europe, and North America.
+
+```{r,include = FALSE}
+cuisines_clean <- cuisines_clean |>
+  filter(continent %in% c("Asia", "Europe", "North America")) |>
+  mutate(continent = as.factor(continent)) |>
+  select(-author, -name, -url, -date_published, - prep_time, -cook_time, -country) |>
+  drop_na()
+```
+
+- In this wrangling step, we filtered the three continents, turned `continent` into factor and deselected variables that we do not want to be in the model. The original data set included more variables that we decided to discard such as `cooking_time` and `prep_time` since `total_time`is the sum of both of them. We also get rid of `name`, `author`, `url` and `date_published` as they are irrelevant to our question and also can overfit our model. Finally, we used `drop_na()` to take out the NAs.
+
+# EDA
+
+## Summary Statistics
+
+```{r, echo = FALSE, results='hold'}
+cuisines_clean |> tbl_summary(include = c(continent, calories, fat, carbs, protein, avg_rating, total_ratings, reviews, total_time, servings))
+```
+
+- As mentioned above, the only new variables we associated with the model is continent, our response varibles which have three level: `Asia`, `Europe` and `North America` due to their relevancy. 
+- `Calories`, `fat`, `carbs` and `protein` are numeric variables that possess the nutritional value, hence their namesake, per serving. `Avg_rating` is the mean value of all ratings on a specific recipie out of 5 with `total_ratings` indicate the total number of rating in thousands unless they are below 1000, in which case the exact number is displayed. Similarly, `reviews` is the total number of reviews per recipe in the thousands unless below 1000. `Total_time` is the sum of both `cook_time` and `prep_time` in minutes and `serving` is the number of servings. Due to practical reason, `ingredients` are not included in the summary table but it is included in the model post-tokenization in which each word of the ingredients can be used to predict the response variables.
+
+- Once we finished the tokenization of the ingredients, we added the 100 most frequently occurring variables to our data for help with the training and regularization.
+
+## Graphs
+```{r, echo = FALSE, fig.cap="Distribution of average recipe ratings across continents. Violin and boxplots show the spread and central tendency of average ratings for recipes originating from Asia, Europe, and North America. The medians of ratings for three continents are a little over 4.5. All three distributions are skewed left."}
+# Bivariate
+cuisines_clean |>
+  ggplot(aes(continent, avg_rating, colour = continent)) +
+  geom_violin(alpha = 0.5) +
+  geom_boxplot(alpha = 0.8) +
+  coord_flip() +
+  labs(
+    title = "Bivariate: Average rating of all recipes across continents",
+    x = "Average rating",
+    y = "Continents"
+  )
+```
+
+```{r, echo = FALSE, fig.cap="Distribution of servings across continents. Violin and boxplots show the spread and central tendency of average ratings for recipes originating from Asia, Europe, and North America. The medians of ratings for three continents are around 5. All three distributions are skewed right"}
+cuisines_clean |>
+  ggplot(aes(continent, servings, colour = continent)) +
+  geom_violin(alpha = 0.5) +
+  geom_boxplot(alpha = 0.8) +
+  coord_flip() +
+  labs(
+    title = "Bivariate: Number of servings of all recipes across continents",
+    x = "Servings",
+    y = "Continents"
+  )
+```
+
+- We can see that all continents have a lot of similar average rating in the range of 4 to 5 stars and similar number of servings as represented in the box and violin plot. However, Europe and Asia have some very low rating compared to North America and the number of servings from European dishes can be way higher than the other twos 
+
+# Model building
+
+```{r, include = FALSE}
+set.seed(123)
+cuisines_split <- initial_split(cuisines_clean)
+cuisines_train_tbl <- training(cuisines_split)
+cuisines_test_tbl <- testing(cuisines_split)
+```
+
+## Random Forest
+
+- We first fit a Random Fores model optimizing `mtry` value using bootstrap. There are 10 levels of `mtry` and the graph below shows the accuracy of each mtry value. The best mtry we picked based on the one standard rule is 4.
+
+```{r, include = FALSE}
+set.seed(1234)
+cuisines_boot <- bootstraps(cuisines_train_tbl, times = 10, strata = continent)
+(cuisines_ranger_grid <- 
+  grid_regular(mtry(range = c(1,10)), levels=10))
+```
+
+```{r, include = FALSE}
+ranger_recipe <- 
+  recipe(formula = continent ~ ., data = cuisines_train_tbl) |>
+  step_tokenize(ingredients) |> 
+  step_tokenfilter(ingredients) |> 
+  step_tfidf(ingredients)
+
+ranger_spec <- 
+  rand_forest(mtry = tune(), trees = 100) |> 
+  set_mode("classification") |> 
+  set_engine("ranger", importance = "impurity") 
+
+ranger_workflow <- 
+  workflow() |>
+  add_recipe(ranger_recipe) |> 
+  add_model(ranger_spec) 
+
+ranger_tune <-
+  tune_grid(ranger_workflow, 
+            resamples = cuisines_boot, 
+            grid = cuisines_ranger_grid)
+```
+
+```{r, echo=FALSE, fig.cap = "Accuracy vs mtry" }
+autoplot(ranger_tune, metric="accuracy") +
+  labs(title = "Accuracy vs mtry")
+```
+
+```{r, echo = FALSE}
+best_mtry <- (select_by_one_std_err(ranger_tune, metric = "accuracy", mtry))
+```
+
+```{r, include = FALSE}
+cuisines_ranger_finalize <- finalize_workflow(ranger_workflow, best_mtry)
+cuisines_ranger_fit <- fit(cuisines_ranger_finalize, cuisines_train_tbl)
+```
+
+```{r, echo=FALSE}
+augment(cuisines_ranger_fit, cuisines_test_tbl) |>
+  accuracy(.pred_class, continent) |>
+  kableExtra::kable(caption = "The accuracy of the Random Forest with the optimized 'mtry' of 4 is 0.644. This shows 64.4% of the continents are classified correctly by the model.")
+```
+
+```{r, echo=FALSE}
+(conf_matrix <- augment(cuisines_ranger_fit, cuisines_test_tbl) |>
+  conf_mat(truth=continent, .pred_class) |>  
+  autoplot(cm, type = "heatmap"))
+```
+
+```{r, echo=FALSE}
+as_tibble(conf_matrix$table) |>
+  kableExtra::kable(caption="The confusion matrix shows North America has the most missclassification, mostly being missclassified with Europe.")
+```
+
+- For the random forest, we decided to used 100 trees after trial and error of using larger number of trees (200, 500, 1000) and got very similar accuracy. Since the data is not unbalanced, accuracy gave a pretty good view on the performance of the model. We also tuned mtry based on the one standard error rule using boostraping and got the best mtry of 4 for our tree. When used on our testing dataset, the model yielded 65% accuracy and our confusion matrix showed that `North America` is the continent with the most misclassification. This makes intuitive sense as we have the fewest number of observations from North America, so the model is then less likely to select North America than it is the other continents.
+
+## LASSO Regression Model
+
+- We also fit a LASSO regression model optimizing the `penalty` using bootstrap. There are 10 levels of penalty and the graph below shows the accuracy of each penalty value. The best penalty we picked based on the one standard rule is 0.00599.
+
+```{r, include = FALSE}
+(cuisines_grid <- 
+  grid_regular(penalty(), levels = 10))
+```
+
+```{r, include = FALSE}
+cuisines_recipe <- 
+  recipe(formula = continent~., data = cuisines_train_tbl) |>
+  step_tokenize(ingredients) |> 
+  step_tokenfilter(ingredients) |> 
+  step_tfidf(ingredients)
+
+cuisines_spec <- 
+  multinom_reg(penalty = tune(), mixture = 1) |>
+  set_mode("classification") |>
+  set_engine("glmnet") 
+
+cuisines_workflow <- 
+  workflow() |> 
+  add_recipe(cuisines_recipe) |> 
+  add_model(cuisines_spec) 
+
+cuisines_tune <- 
+  tune_grid(cuisines_workflow, 
+            resamples = cuisines_boot,
+            grid = cuisines_grid) 
+```
+
+
+```{r, echo=FALSE, fig.cap = "Accuracy vs penalty plot"}
+autoplot(cuisines_tune, metric="accuracy")+
+  labs(title = "Accuracy vs penalty plot")
+```
+
+```{r, echo=FALSE}
+best_penalty <- select_by_one_std_err(cuisines_tune, metric = "accuracy", desc(penalty))
+```
+
+```{r, include = FALSE}
+cuisines_final_wf <- finalize_workflow(cuisines_workflow, best_penalty)
+cuisines_fit <- fit(cuisines_final_wf, cuisines_train_tbl)
+```
+
+```{r, echo=FALSE}
+augment(cuisines_fit, cuisines_test_tbl) |>
+  accuracy(truth=continent, .pred_class) |>
+  kableExtra::kable(caption = "The accuracy of the LASSO regression model with optimized 'penalty' of 0.00599 is 0.667. This shows 66.7% of the continents are classified correctly by the LASSO model.")
+```
+
+```{r, echo=FALSE}
+(conf_matrix_2 <- augment(cuisines_fit, cuisines_test_tbl) |>
+  conf_mat(truth=continent, .pred_class) |>
+  autoplot(cm, type = "heatmap"))
+
+as_tibble(conf_matrix_2$table)|>
+  kableExtra::kable(caption="The confusion matrix from the LASSO model shows North America also has the most missclassification, mostly being missclassified with Europe.")
+```
+
+- Our model perform with 67% accuracy and our confusion matrix shows that `North America` has the most misclassification.
+
+# Model refinement
+
+- We have put together two tables below to show the Top 10 most important
+variables for each model using `vip` function.
+
+## Random Forest: Top 10 most important variables
+```{r, echo=FALSE, fig.cap = "Random Forest's most important variables"}
+vip(cuisines_ranger_fit)
+```
+
+## LASSO: Top 10 most important variables
+```{r, echo=FALSE, fig.cap = "Lasso regression's most important variables"}
+vip(cuisines_fit)
+```
+
+- In the Random Forest, the top 5 most important indicators are soy, ginger, butter, sauce, and pepper. In the LASSO model, the top 5 most important indicators are oil, soy, ginger, paste and water. These indicators are all under variable `ingredients`, and we saw that there is no known relationships in the problem, so we decided to not exclude any variables from the model. Although it is worth to noted that the tokenized approach is imperfect as it's using individual words and not the conventional meaning of the word ingredients. Such as the indicators soy and sauce can be a separate concepts or they are the same thing: *soy sauce*, or the indicators all, purpose, flour can be *all purpose flour*. We also need to taken them with a grain of salt because the model evaluated their important on their count (i.e. how many times they are written out) instead of an more intuitive way of basing them on how much are they used per recipe (e.g. 1/2 table spoon of oil).
+
+# Conclusion
+
+In summary, our analysis demonstrates that both the Random Forest and LASSO models are reasonably effective at predicting the continent of origin for a recipe using nutritional information, preparation details, and tokenized ingredient text. While the overall accuracies of 0.644 for Random Forest and 0.667 for LASSO leave room for improvement, they show that significant patterns exist within the data. Across both models, different ingredients emerged as the most influential predictors, with recurring tokens such as soy and ginger reflecting the distinctive flavor profiles of certain cuisines from different continents. At the same time, some surprising indicators and odd tokens revealed the limitations of relying on single-word ingredient features, suggesting that more advanced text-processing methods could strengthen future models. Despite these challenges, our results highlight the potential of combining structured nutritional data with textual information to classify recipes by geographic origin, offering a promising foundation for more refined approaches moving forward.
+
+**Summary Table**
+
+| Model | Accuracy  | Top 5 Variables  |
+|-------------|-------------|-------------|
+| Random Forest  | 0.653 | soy, ginger, butter, sauce, pepper |   
+| LASSO | 0.667| oil, soy, ginger, paste, water |   
+
+**LASSO Model Coefficients**
+
+- We pulled out the top 5 most positive and negative coefficients in each class (Asia, North America, and Europe) to see how they are affecting the predicted classification. 
+
+```{r, echo=FALSE}
+tidy(cuisines_fit) |>
+  filter(estimate != 0) |>
+  group_by(class) |>
+  slice_max(estimate, n = 5) |>
+  ungroup() |>
+  rename_with(~ paste0("**", str_to_title(.x), "**")) |>
+  kableExtra::kable(caption="For Asia, the most positive coefficient is 28.5. For Europe, it is 13 and for North America, it is 10.6. These coefficients have the most positive contribution to the probability of predicting each continent.")
+
+tidy(cuisines_fit) |>
+  filter(estimate != 0) |>
+  group_by(class) |>
+  slice_min(estimate, n = 5) |>
+  ungroup() |>
+  rename_with(~ paste0("**", str_to_title(.x), "**")) |>
+  kableExtra::kable(caption = "For Asia, the most negative coefficient is -8.95. For Europe, it is -11.2 and for North America, it is -8.29. These coefficients have the most negative contribution to the probability of predicting each continent.")
+```
+
+- For all continents, the top 5 highest and lowest coefficients all come from the same variable: `ingredients`. Each tokenized indicator shows how diverse the ingredients each continent tends to use. 
+- `Asia`: Highest coefficients are within expectation with ginger and soy as these two ingredients also appear in the Random Forest `vip` plot. While the lowest coefficients are quite surprising with salt having a very negative impact.
+- `Europe`: Highest coefficients included olive which can be both the vegetable and the oil which is not surprising. The lowest coefficient is from ingredient cayenne, which is a type of chili pepper. 
+- `North America`: Highest coefficients included another mysterious ingredients: juice, brown and green, with bell pepper as an essential ingredients which does make sense upon reflection. The most negative coefficient for `North America` is -8.292 and the term is `tfidf_ingredients_grated`. This is not an ingredient but rather a cooking method in the `ingredients` variable.

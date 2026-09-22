@@ -10,13 +10,15 @@ about:
       href: https://www.linkedin.com/in/nhi-luong-40a80a298/
     - text: GitHub
       href: https://github.com/nhiluong34
+    - text: Asian Studies Porfolio
+      href: https://luong2.wixsite.com/my-sites
     - text: Email
-      href: mailto:luong2@stolaf.edu
+      href: mailto: luongwork27@gmail.com
 ---
 
 ## About Me
 
-Hello! I'm Nhi. I'm an undergraduate student studying Mathematics, Data Science, and Chinese at St. Olaf College. I love learning about text and sentiment analysis. My journey in data science has just begun and I'm very excited to see what's ahead!
+Hello! I'm Nhi, a new grad student studying Mathematics, Data Science, and Chinese from St. Olaf College. I'm passionate about text and sentiment analysis and I currently have a big interest in transportation, specifically in aviation and metro system. My journey in data science has just begun and I'm very excited to see what's ahead!
 
 Outside of academia, I collect a lot of Lego sets and my favorite themes are Architecture and Technic. I also like to travel abroad as well.
 

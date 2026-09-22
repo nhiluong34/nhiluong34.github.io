@@ -31,6 +31,8 @@ website:
         menu:
           - text: "Handwritten Digits Classification"
             href: Digits classification.qmd
+          - text: "Recipes Origin Prediction"
+            href: Recipe Origin Prediction.qmd
 format:
   html:
     code-fold: true
