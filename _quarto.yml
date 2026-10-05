@@ -7,20 +7,18 @@ website:
     left:
       - href: index.qmd
         text: Home
-      - text: "SDS 264 Projects"
-        menu: 
-          - text: "Mini-Project 1"
-            href: Airline Customer Reviews Analysis.qmd
-          - text: "Choropleth maps"
-            href: States map.qmd
       - text: "Data Science Projects"
         menu:
           - text: "Korean Drama Analysis"
             href: Korean Drama Analysis.qmd
           - text: "Airline Reviews Analysis"
             href: Airline Customer Reviews Analysis.qmd
-          - text: "tmcn R Package "
+          - text: "Explore tmcn R Package "
             href: R_tip.qmd
+          - text: "Making USA State Maps!"
+            href: States map.qmd
+          - text: "Web Scraping Application"
+            href: Restaurant_web_scraping.qmd
       - text: "Statistics Projects"
         menu: 
           - text: "Asian American Quality of Life"
